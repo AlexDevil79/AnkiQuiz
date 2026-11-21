@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AnkiQuiz</title>
-<link rel="stylesheet" href="style.css?v=6">
+<link rel="stylesheet" href="style.css?v=7">
 </head>
 <body>
 <header>
@@ -67,7 +67,7 @@
           <h2><span class="num">2</span> Réglages</h2>
           <label>Nombre de questions <input type="number" id="nbQ" min="1" value="20"></label>
           <label>Secondes pour répondre <input type="number" id="secs" min="2" value="5"></label>
-          <label class="row"><input type="checkbox" id="auto"> Démarrer dès que tout le monde est prêt</label>
+          <label class="switch"><input type="checkbox" id="auto"><span class="track"></span><span class="swtxt">Démarrer dès que tout le monde est prêt<small>La partie se lance quand chaque joueur a cliqué sur « Prêt »</small></span></label>
         </div>
       </div>
       <div class="card">
@@ -84,6 +84,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>
