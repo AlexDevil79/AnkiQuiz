@@ -121,7 +121,7 @@ function show(id) {
 
 /* ================= MAÎTRE ================= */
 function newGame() {
-  return { code: '', phase: 'lobby', players: {}, queue: [], idx: 0, locked: new Set(), buzzer: null, seq: 0, current: null, result: null, settings: { secs: 10, nb: 20, auto: false }, timer: null };
+  return { code: '', phase: 'lobby', players: {}, queue: [], idx: 0, locked: new Set(), buzzer: null, seq: 0, current: null, result: null, settings: { secs: 5, nb: 20, auto: false }, timer: null };
 }
 
 function startHost() {
@@ -210,7 +210,7 @@ function checkAuto() {
 async function startGame() {
   const sel = [...document.querySelectorAll('.deckSel:checked')].flatMap((i) => library[+i.value].cards);
   if (!sel.length) return alert('Sélectionne au moins un deck.');
-  G.settings = { secs: Math.max(2, +$('#secs').value || 10), nb: Math.max(1, +$('#nbQ').value || 20), auto: $('#auto').checked };
+  G.settings = { secs: Math.max(2, +$("#secs").value || 5), nb: Math.max(1, +$('#nbQ').value || 20), auto: $('#auto').checked };
   for (let i = sel.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [sel[i], sel[j]] = [sel[j], sel[i]]; }
   G.queue = sel.slice(0, G.settings.nb);
   G.idx = 0;
@@ -266,6 +266,7 @@ async function advance2() {
 }
 
 function backToLobby() {
+  clearTimeout(G.timer); G.buzzer = null; G.lastBuzzer = null; G.locked = new Set(); G.result = null;
   G.phase = 'lobby'; G.current = null; G.queue = [];
   Object.values(G.players).forEach((p) => { p.ready = false; p.score = 0; });
   broadcast();
@@ -362,8 +363,9 @@ function board(host) {
   return '<div class="board">' + sorted().map((p, i) => {
     const cls = ['pl', !p.connected && 'off', S.buzzer === p.name && 'buzz', S.locked.includes(p.name) && (S.phase === 'question' || S.phase === 'answering') && 'locked', p.name === myName && 'me', S.phase === 'lobby' && p.ready && 'ready', (prevScores[p.name] ?? p.score) < p.score && 'pop'].filter(Boolean).join(' ');
     const sc = S.phase === 'lobby' ? (p.ready ? '✓' : '…') : p.score;
+    const minus = host ? `<button class="minus" data-minus="${esc(p.name)}" title="Retirer 1 point (erreur)">−1</button>` : '';
     const plus = host && S.phase !== 'end' ? `<button class="plus" data-award="${esc(p.name)}" title="+1 point et question suivante">+1 ▶</button>` : '';
-    return `<div class="${cls}" style="--c:${col(p.name)}"><span class="rk">${i + 1}</span>${av(p.name)}<span class="nm">${esc(p.name)}</span><span class="sc">${sc}</span>${plus}</div>`;
+    return `<div class="${cls}" style="--c:${col(p.name)}"><span class="rk">${i + 1}</span>${av(p.name)}<span class="nm">${esc(p.name)}</span><span class="sc">${sc}</span>${minus}${plus}</div>`;
   }).join('') + '</div>';
 }
 
@@ -389,6 +391,13 @@ function podium() {
   return `<div class="card podium-card"><h2 class="center">🏆 Classement final</h2><div class="podium">${order.map((i) => `<div class="pod p${i + 1}" style="--c:${col(t[i].name)}"><div class="medal">${['🥇', '🥈', '🥉'][i]}</div>${av(t[i].name)}<div class="nm">${esc(t[i].name)}</div><div class="bar"><b>${t[i].score}</b></div></div>`).join('')}</div>${rest.length ? '<div class="board">' + rest.map((p, i) => `<div class="pl" style="--c:${col(p.name)}"><span class="rk">${i + 4}</span>${av(p.name)}<span class="nm">${esc(p.name)}</span><span class="sc">${p.score}</span></div>`).join('') + '</div>' : ''}</div>`;
 }
 
+function adjust(name, d) {
+  const p = G.players[name];
+  if (!p) return;
+  p.score = Math.max(0, p.score + d);
+  broadcast();
+}
+
 async function award(name) {
   if (G.phase === 'lobby' || G.phase === 'end') return;
   clearTimeout(G.timer);
@@ -408,7 +417,7 @@ function hostView() {
   } else if (ph === 'reveal') ctl = '<button id="nextBtn" class="btn primary big">Question suivante ▶ <kbd>Espace</kbd></button>' + ans;
   else if (ph === 'end') ctl = '<button id="againBtn" class="btn primary big">Nouvelle partie</button>';
   const stage = ph === 'end' ? `${podium()}<div class="ctl">${ctl}</div>` : `${qcard()}${statusBox()}<div class="ctl">${ctl}</div>`;
-  return `<div class="dash"><div class="stage">${stage}</div><aside class="side"><h3>Joueurs</h3>${board(true)}<p class="hint">« +1 ▶ » donne un point et passe à la question suivante.</p></aside></div>`;
+  return `<div class="dash"><div class="stage">${stage}</div><aside class="side"><h3>Joueurs</h3>${board(true)}<p class="hint">« +1 ▶ » donne un point et passe à la question suivante. « −1 » corrige une erreur.</p><button id="resetBtn" class="btn small ko reset">↺ Reset la room</button></aside></div>`;
 }
 
 function playerView() {
@@ -472,6 +481,8 @@ function render() {
   const bz = $('#buzz'); if (bz) bz.onpointerdown = buzzClick;
   on('#ansBtn', () => { showAns = !showAns; render(); });
   on('#skipBtn', skip); on('#okBtn', validate); on('#koBtn', refuse); on('#nextBtn', next); on('#againBtn', backToLobby);
+  on('#resetBtn', () => { if (confirm('Réinitialiser la room ? La partie en cours est arrêtée et les scores remis à zéro.')) backToLobby(); });
+  g.querySelectorAll('[data-minus]').forEach((b) => (b.onclick = () => adjust(b.dataset.minus, -1)));
   g.querySelectorAll('[data-award]').forEach((b) => (b.onclick = () => award(b.dataset.award)));
   tick(); effects();
   S.players.forEach((p) => (prevScores[p.name] = p.score));
@@ -496,17 +507,14 @@ document.addEventListener('keydown', (e) => {
 });
 
 /* ---- préférences (thème, taille du texte, son) ---- */
-let prefTheme = ls('qa-theme') || 'dark', prefQs = +ls('qa-qs') || 1;
+let prefTheme = ls('qa-theme') || 'dark';
 function applyPrefs() {
   document.documentElement.dataset.theme = prefTheme;
-  document.documentElement.style.setProperty('--qs', prefQs);
   $('#muteBtn').textContent = muted() ? '🔇' : '🔊';
   $('#themeBtn').textContent = prefTheme === 'dark' ? '☀️' : '🌙';
 }
 $('#muteBtn').onclick = () => { ls('qa-mute', muted() ? '0' : '1'); initAudio(); applyPrefs(); };
 $('#themeBtn').onclick = () => { prefTheme = prefTheme === 'dark' ? 'light' : 'dark'; ls('qa-theme', prefTheme); applyPrefs(); };
-$('#fsDown').onclick = () => { prefQs = Math.max(0.7, +(prefQs - 0.15).toFixed(2)); ls('qa-qs', prefQs); applyPrefs(); };
-$('#fsUp').onclick = () => { prefQs = Math.min(2.2, +(prefQs + 0.15).toFixed(2)); ls('qa-qs', prefQs); applyPrefs(); };
 applyPrefs();
 
 /* ================= Init ================= */

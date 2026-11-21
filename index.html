@@ -4,15 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AnkiQuiz</title>
-<link rel="stylesheet" href="style.css?v=5">
+<link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
 <header>
   <h1>🔔 AnkiQuiz</h1>
   <span id="roomTag"></span>
   <div class="tools">
-    <button id="fsDown" class="tool" title="Texte plus petit">A−</button>
-    <button id="fsUp" class="tool" title="Texte plus grand">A+</button>
     <button id="themeBtn" class="tool" title="Thème clair / sombre">☀️</button>
     <button id="muteBtn" class="tool" title="Son">🔊</button>
   </div>
@@ -39,7 +37,7 @@
           <li>Charge tes decks <code>.apkg</code> et règle la partie</li>
           <li>Arbitre les réponses données à l'oral</li>
         </ol>
-        <button id="hostBtn" class="btn big">Créer une room (maître)</button>
+        <button id="hostBtn" class="btn big">Créer une room</button>
       </div>
     </div>
   </section>
@@ -68,7 +66,7 @@
         <div class="card">
           <h2><span class="num">2</span> Réglages</h2>
           <label>Nombre de questions <input type="number" id="nbQ" min="1" value="20"></label>
-          <label>Secondes pour répondre <input type="number" id="secs" min="2" value="10"></label>
+          <label>Secondes pour répondre <input type="number" id="secs" min="2" value="5"></label>
           <label class="row"><input type="checkbox" id="auto"> Démarrer dès que tout le monde est prêt</label>
         </div>
       </div>
@@ -86,6 +84,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>
