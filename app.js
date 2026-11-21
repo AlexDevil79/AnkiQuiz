@@ -107,7 +107,7 @@ let role = null; // 'host' | 'player'
 let peer = null;
 let myName = '';
 let S = null; // état public reçu (joueur) ou calculé (maître)
-let timerEnd = 0, lastSeq = -1, showAns = false;
+let timerEnd = 0, lastSeq = -1, showAns = false, pick = null;
 
 // côté maître
 let G = null;
@@ -182,7 +182,7 @@ function onHostMsg(c, d) {
   if (d.t === 'buzz' && G.phase === 'question' && !G.locked.has(name)) {
     G.phase = 'answering'; G.buzzer = name; G.lastBuzzer = name; G.seq++;
     clearTimeout(G.timer);
-    G.timer = setTimeout(refuse, G.settings.secs * 1000);
+    G.timer = setTimeout(refuse, (G.settings.secs + 1) * 1000); // +1s de grâce pour le maître
     broadcast();
   }
 }
@@ -217,7 +217,7 @@ async function startGame() {
 async function loadQuestion() {
   const card = G.queue[G.idx];
   G.current = { front: await inlineMedia(card.front, card.src), answer: await inlineMedia(card.answer, card.src) };
-  G.locked = new Set(); G.buzzer = null; G.lastBuzzer = null; showAns = false; G.result = null; G.phase = 'question';
+  G.locked = new Set(); G.buzzer = null; G.lastBuzzer = null; showAns = false; pick = null; G.result = null; G.phase = 'question';
   broadcast();
 }
 
@@ -299,12 +299,25 @@ function chips() {
   }).join('') + '</div>';
 }
 
+function awardBox() {
+  const sel = pick || S.lastBuzzer || '';
+  return `<div class="actions" style="margin-top:14px"><select id="pickSel">${S.players.map((p) => `<option value="${esc(p.name)}" ${p.name === sel ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select><button id="awardBtn" class="ok">+1 point et suivante</button></div>`;
+}
+
+async function award(name) {
+  if (G.phase === 'lobby' || G.phase === 'end') return;
+  clearTimeout(G.timer);
+  if (G.players[name]) G.players[name].score++;
+  G.buzzer = null;
+  await next();
+}
+
 function hostActions(answering) {
   const last = S.lastBuzzer;
   return '<div class="actions">' +
     (last ? `<button class="ok" id="okBtn">✓ Valider (+1 ${esc(last)})</button>` : '<button id="skipBtn">Passer la question</button>') +
     (answering ? '<button class="ko" id="koBtn">✗ Refuser</button>' : '') +
-    `</div><div class="actions" style="margin-top:14px"><button id="ansBtn">${showAns ? '🙈 Masquer' : '👁 Afficher'} la réponse</button></div>`;
+    `</div><div class="actions" style="margin-top:14px"><button id="ansBtn">${showAns ? '🙈 Masquer' : '👁 Afficher'} la réponse</button></div>` + awardBox();
 }
 
 function render() {
@@ -330,7 +343,7 @@ function render() {
   } else if (S.phase === 'reveal') {
     h += qBox();
     h += `<div class="banner">${S.result?.name ? `✅ Point pour <b>${esc(S.result.name)}</b>` : 'Personne ne marque'}</div>`;
-    if (host) h += `<div class="actions"><button class="primary" id="nextBtn">Question suivante</button></div><div class="actions" style="margin-top:14px"><button id="ansBtn">${showAns ? '🙈 Masquer' : '👁 Afficher'} la réponse</button></div>`;
+    if (host) h += `<div class="actions"><button class="primary" id="nextBtn">Question suivante</button></div><div class="actions" style="margin-top:14px"><button id="ansBtn">${showAns ? '🙈 Masquer' : '👁 Afficher'} la réponse</button></div>` + awardBox();
   } else if (S.phase === 'end') {
     const top = [...S.players].sort((a, b) => b.score - a.score);
     h += `<div class="card"><h2>🏆 Classement</h2><table>${top.map((p, i) => `<tr><td>${i + 1}. ${esc(p.name)}</td><td>${p.score} pt</td></tr>`).join('')}</table></div>`;
@@ -342,6 +355,8 @@ function render() {
   const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
   on('#readyBtn', () => send({ t: 'ready', v: !S.players.find((p) => p.name === myName)?.ready }));
   on('#buzz', () => send({ t: 'buzz' }));
+  on('#awardBtn', () => award($('#pickSel').value));
+  if ($('#pickSel')) $('#pickSel').onchange = (e) => (pick = e.target.value);
   on('#ansBtn', () => { showAns = !showAns; render(); }); on('#skipBtn', skip); on('#okBtn', validate); on('#koBtn', refuse); on('#nextBtn', next); on('#againBtn', backToLobby);
 }
 

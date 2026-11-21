@@ -12,6 +12,7 @@ label{display:block;margin-bottom:8px}label.row{display:flex;gap:8px;align-items
 label input[type=number]{width:90px;margin-left:8px}
 button{padding:10px 16px;border:0;border-radius:8px;background:#2b3050;color:var(--fg);font-size:1rem;cursor:pointer}
 button.primary{background:var(--acc)}button.ok{background:var(--ok)}button.ko{background:var(--ko)}
+select{padding:10px;border-radius:8px;border:1px solid #333a55;background:#12141c;color:var(--fg);font-size:1rem}
 button.small{padding:6px 10px;font-size:.85rem}
 button:disabled{opacity:.4;cursor:not-allowed}
 .bigcode{font-size:3rem;letter-spacing:.3em;font-weight:700;margin:4px 0 8px;padding-left:.3em}
