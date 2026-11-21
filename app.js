@@ -222,7 +222,7 @@ async function loadQuestion() {
 }
 
 function checkAllLocked() {
-  if (connected().every((p) => G.locked.has(p.name))) { G.phase = 'reveal'; G.result = { none: true }; }
+  if (connected().every((p) => G.locked.has(p.name))) { G.phase = 'reveal'; showAns = true; G.result = { none: true }; }
 }
 
 function refuse() {
@@ -238,11 +238,11 @@ function validate() {
   clearTimeout(G.timer);
   const w = G.players[G.lastBuzzer];
   if (w) w.score++;
-  G.result = w ? { name: w.name } : { none: true }; G.buzzer = null; G.phase = 'reveal';
+  showAns = true; G.result = w ? { name: w.name } : { none: true }; G.buzzer = null; G.phase = 'reveal';
   broadcast();
 }
 
-function skip() { G.phase = 'reveal'; G.result = { none: true }; G.buzzer = null; broadcast(); }
+function skip() { G.phase = 'reveal'; showAns = true; G.result = { none: true }; G.buzzer = null; broadcast(); }
 
 async function next() {
   G.idx++;
@@ -313,7 +313,7 @@ function render() {
   show('game');
   const host = role === 'host';
   let h = chips();
-  const qBox = () => `<div class="card"><div class="muted center">Question ${S.idx + 1} / ${S.total}</div><div class="question">${sanitize(S.front)}</div>${((host && showAns) || S.phase === 'reveal') && S.answer ? `<div class="answer">${sanitize(S.answer)}</div>` : ''}</div>`;
+  const qBox = () => `<div class="card"><div class="muted center">Question ${S.idx + 1} / ${S.total}</div><div class="question">${sanitize(S.front)}</div>${(host ? showAns : S.phase === 'reveal') && S.answer ? `<div class="answer">${sanitize(S.answer)}</div>` : ''}</div>`;
 
   if (S.phase === 'lobby') {
     const me = S.players.find((p) => p.name === myName);
@@ -330,7 +330,7 @@ function render() {
   } else if (S.phase === 'reveal') {
     h += qBox();
     h += `<div class="banner">${S.result?.name ? `✅ Point pour <b>${esc(S.result.name)}</b>` : 'Personne ne marque'}</div>`;
-    if (host) h += '<div class="actions"><button class="primary" id="nextBtn">Question suivante</button></div>';
+    if (host) h += `<div class="actions"><button class="primary" id="nextBtn">Question suivante</button></div><div class="actions" style="margin-top:14px"><button id="ansBtn">${showAns ? '🙈 Masquer' : '👁 Afficher'} la réponse</button></div>`;
   } else if (S.phase === 'end') {
     const top = [...S.players].sort((a, b) => b.score - a.score);
     h += `<div class="card"><h2>🏆 Classement</h2><table>${top.map((p, i) => `<tr><td>${i + 1}. ${esc(p.name)}</td><td>${p.score} pt</td></tr>`).join('')}</table></div>`;
