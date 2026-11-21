@@ -118,3 +118,30 @@ kbd{font:inherit;font-size:.7rem;opacity:.7;border:1px solid currentColor;border
 .switch input:checked+.track::after{transform:translateX(20px)}
 .switch input:focus-visible+.track{outline:2px solid var(--acc);outline-offset:2px}
 .swtxt{display:flex;flex-direction:column;line-height:1.25}.swtxt small{color:var(--muted);font-size:.78rem;margin-top:2px}
+
+/* --- v8 : équipes, pause, stats, bannière, langue --- */
+#banner{position:sticky;top:49px;z-index:4;display:flex;align-items:center;justify-content:center;gap:12px;padding:8px;background:var(--ko);color:#fff;font-weight:600}
+#banner[hidden]{display:none}
+.resume{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--card2);border:1px solid var(--acc);border-radius:12px;padding:8px 10px;margin-bottom:10px}
+.resume span{flex:1;min-width:140px}
+.kick{border:0;background:transparent;color:var(--muted);cursor:pointer;font-size:.9rem;padding:2px 6px;border-radius:6px}.kick:hover{color:var(--ko)}
+.deck{justify-content:space-between}.deck label{margin:0;flex:1}
+.pre{white-space:pre-line}
+.field{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:var(--card2);color:var(--fg);padding:6px 14px;cursor:pointer;font-size:.95rem}
+.seg button.on{background:linear-gradient(135deg,var(--acc),var(--acc2));color:#fff}
+.tdot{border:0;border-radius:99px;background:var(--c);color:#fff;font-size:.72rem;padding:2px 8px;cursor:pointer}
+.team{border-left:4px solid var(--c);padding-left:8px;margin-bottom:6px}
+.thead{display:flex;justify-content:space-between;align-items:center;font-weight:700;color:var(--c);margin:2px 0 4px}.thead b{font-size:1.3rem}
+.team .pl{margin-bottom:4px}.tiny{font-size:.8rem}
+.pausedbox{background:color-mix(in srgb,var(--acc) 20%,var(--card));border-color:var(--acc);font-weight:700;animation:beat 1.6s infinite}
+.award{margin:0 0 10px;font-size:1.05rem}
+.tscroll{overflow-x:auto}
+table.stats{width:100%;border-collapse:collapse;font-size:.95rem}
+table.stats th{color:var(--muted);font-weight:600;text-align:center;padding:4px}table.stats th:first-child{text-align:left}
+table.stats td{padding:6px 4px;border-top:1px solid var(--line);text-align:center}table.stats td:first-child{text-align:left;white-space:nowrap}
+table.stats .av{width:22px;height:22px;font-size:.75rem;vertical-align:middle}
+.missed{padding-left:18px;margin:6px 0}.missed li{margin:4px 0}
+details{margin-top:12px}summary{cursor:pointer;color:var(--muted)}
+.mebar .tool{margin-left:4px}

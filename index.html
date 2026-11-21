@@ -4,40 +4,48 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AnkiQuiz</title>
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 <header>
   <h1>🔔 AnkiQuiz</h1>
   <span id="roomTag"></span>
   <div class="tools">
-    <button id="themeBtn" class="tool" title="Thème clair / sombre">☀️</button>
-    <button id="muteBtn" class="tool" title="Son">🔊</button>
+    <button id="langBtn" class="tool" title="Language / Langue">EN</button>
+    <button id="themeBtn" class="tool" title="Theme">☀️</button>
+    <button id="muteBtn" class="tool" title="Sound">🔊</button>
   </div>
 </header>
+<div id="banner" hidden><span id="bannerTxt"></span><button id="leaveBtn" class="btn small" data-i18n="leaveBtn">Quitter</button></div>
 <main>
   <section id="home" class="view">
     <div class="hero">
       <div class="logo">🔔</div>
       <h2>AnkiQuiz</h2>
-      <p>Le quizz buzzer multijoueur à partir de tes decks Anki.</p>
+      <p data-i18n="tagline"></p>
     </div>
     <div class="cols">
       <div class="card">
-        <h2>🎮 Rejoindre une partie</h2>
-        <input id="joinCode" placeholder="CODE" maxlength="5" autocapitalize="characters" autocomplete="off" class="codein">
-        <input id="joinName" placeholder="Ton pseudo" maxlength="20" autocomplete="off">
-        <button id="joinBtn" class="btn primary big">Rejoindre</button>
+        <h2 data-i18n="joinTitle"></h2>
+        <input id="joinCode" data-i18n-ph="codePh" maxlength="5" autocapitalize="characters" autocomplete="off" class="codein">
+        <input id="joinName" data-i18n-ph="namePh" maxlength="20" autocomplete="off">
+        <button id="joinBtn" class="btn primary big" data-i18n="join"></button>
         <p id="joinErr" class="err"></p>
       </div>
       <div class="card">
-        <h2>🎤 Animer une partie</h2>
+        <h2 data-i18n="hostTitle"></h2>
         <ol class="steps">
-          <li>Crée une room et partage le code (ou le QR code)</li>
-          <li>Charge tes decks <code>.apkg</code> et règle la partie</li>
-          <li>Arbitre les réponses données à l'oral</li>
+          <li data-i18n="step1"></li>
+          <li data-i18n-html="step2"></li>
+          <li data-i18n="step3"></li>
         </ol>
-        <button id="hostBtn" class="btn big">Créer une room</button>
+        <div id="resumeBox" class="resume" hidden>
+          <span id="resumeTxt"></span>
+          <button id="resumeBtn" class="btn small primary" data-i18n="resumeBtn"></button>
+          <button id="resumeDel" class="kick" title="✕">✕</button>
+        </div>
+        <button id="hostBtn" class="btn big" data-i18n="createRoom"></button>
+        <p id="hostMsg" class="err"></p>
       </div>
     </div>
   </section>
@@ -46,34 +54,39 @@
     <div class="card roomcard">
       <div class="qr" id="qr"></div>
       <div class="center">
-        <div class="muted">Code de la room</div>
+        <div class="muted" data-i18n="roomCodeLbl"></div>
         <div id="roomCode" class="bigcode">…</div>
         <div class="actions">
-          <button id="copyLink" class="btn small">📋 Copier le lien</button>
-          <button id="tvBtn" class="btn small">📺 Écran TV</button>
+          <button id="copyLink" class="btn small" data-i18n="copyLink"></button>
+          <button id="tvBtn" class="btn small" data-i18n="tvBtn"></button>
         </div>
       </div>
     </div>
     <div class="cols">
       <div>
         <div class="card">
-          <h2><span class="num">1</span> Decks</h2>
-          <label class="drop" for="files">📁 Choisir des fichiers .apkg</label>
+          <h2><span class="num">1</span> <span data-i18n="decks"></span></h2>
+          <label class="drop" for="files" data-i18n="chooseFiles"></label>
           <input type="file" id="files" accept=".apkg" multiple hidden>
-          <p id="loadMsg" class="muted"></p>
+          <p id="loadMsg" class="muted pre"></p>
           <div id="deckList"></div>
         </div>
         <div class="card">
-          <h2><span class="num">2</span> Réglages</h2>
-          <label>Nombre de questions <input type="number" id="nbQ" min="1" value="20"></label>
-          <label>Secondes pour répondre <input type="number" id="secs" min="2" value="5"></label>
-          <label class="switch"><input type="checkbox" id="auto"><span class="track"></span><span class="swtxt">Démarrer dès que tout le monde est prêt<small>La partie se lance quand chaque joueur a cliqué sur « Prêt »</small></span></label>
+          <h2><span class="num">2</span> <span data-i18n="settings"></span></h2>
+          <label><span data-i18n="nbQ"></span> <input type="number" id="nbQ" min="1" value="20"></label>
+          <label><span data-i18n="secs"></span> <input type="number" id="secs" min="2" value="5"></label>
+          <div class="field"><span data-i18n="teams"></span>
+            <div class="seg" id="teamSeg">
+              <button data-n="0" class="on" data-i18n="teamOff"></button><button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button>
+            </div>
+          </div>
+          <label class="switch"><input type="checkbox" id="auto"><span class="track"></span><span class="swtxt"><span data-i18n="auto"></span><small data-i18n="autoHint"></small></span></label>
         </div>
       </div>
       <div class="card">
-        <h2><span class="num">3</span> Joueurs</h2>
+        <h2><span class="num">3</span> <span data-i18n="playersTitle"></span></h2>
         <div id="lobbyPlayers"></div>
-        <button id="startBtn" class="btn primary big" disabled>Lancer la partie</button>
+        <button id="startBtn" class="btn primary big" disabled data-i18n="startGame"></button>
       </div>
     </div>
   </section>
@@ -82,8 +95,12 @@
 </main>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fzstd@0.1.1/umd/index.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-<script src="app.js?v=7"></script>
+<script src="i18n.js?v=8"></script>
+<script src="store.js?v=8"></script>
+<script src="anki.js?v=8"></script>
+<script src="app.js?v=8"></script>
 </body>
 </html>
