@@ -107,7 +107,7 @@ let role = null; // 'host' | 'player'
 let peer = null;
 let myName = '';
 let S = null; // état public reçu (joueur) ou calculé (maître)
-let timerEnd = 0, lastSeq = -1;
+let timerEnd = 0, lastSeq = -1, showAns = false;
 
 // côté maître
 let G = null;
@@ -146,7 +146,7 @@ const connected = () => Object.values(G.players).filter((p) => p.connected);
 function publicState(forHost) {
   const s = {
     code: G.code, phase: G.phase, idx: G.idx, total: G.queue.length, seq: G.seq,
-    secs: G.settings.secs, buzzer: G.buzzer, locked: [...G.locked], result: G.result,
+    secs: G.settings.secs, buzzer: G.buzzer, lastBuzzer: G.lastBuzzer || null, locked: [...G.locked], result: G.result,
     front: G.current?.front || '',
     answer: forHost || G.phase === 'reveal' ? G.current?.answer || '' : '',
     players: Object.values(G.players).map(({ name, ready, score, connected }) => ({ name, ready, score, connected })),
@@ -180,7 +180,7 @@ function onHostMsg(c, d) {
   if (!p) return;
   if (d.t === 'ready' && G.phase === 'lobby') { p.ready = !!d.v; broadcast(); checkAuto(); }
   if (d.t === 'buzz' && G.phase === 'question' && !G.locked.has(name)) {
-    G.phase = 'answering'; G.buzzer = name; G.seq++;
+    G.phase = 'answering'; G.buzzer = name; G.lastBuzzer = name; G.seq++;
     clearTimeout(G.timer);
     G.timer = setTimeout(refuse, G.settings.secs * 1000);
     broadcast();
@@ -217,7 +217,7 @@ async function startGame() {
 async function loadQuestion() {
   const card = G.queue[G.idx];
   G.current = { front: await inlineMedia(card.front, card.src), answer: await inlineMedia(card.answer, card.src) };
-  G.locked = new Set(); G.buzzer = null; G.result = null; G.phase = 'question';
+  G.locked = new Set(); G.buzzer = null; G.lastBuzzer = null; showAns = false; G.result = null; G.phase = 'question';
   broadcast();
 }
 
@@ -234,10 +234,11 @@ function refuse() {
 }
 
 function validate() {
-  if (G.phase !== 'answering') return;
+  if (G.phase !== 'answering' && G.phase !== 'question') return;
   clearTimeout(G.timer);
-  G.players[G.buzzer].score++;
-  G.result = { name: G.buzzer }; G.phase = 'reveal';
+  const w = G.players[G.lastBuzzer];
+  if (w) w.score++;
+  G.result = w ? { name: w.name } : { none: true }; G.buzzer = null; G.phase = 'reveal';
   broadcast();
 }
 
@@ -298,25 +299,33 @@ function chips() {
   }).join('') + '</div>';
 }
 
+function hostActions(answering) {
+  const last = S.lastBuzzer;
+  return '<div class="actions">' +
+    (last ? `<button class="ok" id="okBtn">✓ Valider (+1 ${esc(last)})</button>` : '<button id="skipBtn">Passer la question</button>') +
+    (answering ? '<button class="ko" id="koBtn">✗ Refuser</button>' : '') +
+    `</div><div class="actions" style="margin-top:14px"><button id="ansBtn">${showAns ? '🙈 Masquer' : '👁 Afficher'} la réponse</button></div>`;
+}
+
 function render() {
   if (!S) return;
   if (role === 'host' && S.phase === 'lobby') return show('setup');
   show('game');
   const host = role === 'host';
   let h = chips();
-  const qBox = () => `<div class="card"><div class="muted center">Question ${S.idx + 1} / ${S.total}</div><div class="question">${sanitize(S.front)}</div>${(host || S.phase === 'reveal') && S.answer ? `<div class="answer">${sanitize(S.answer)}</div>` : ''}</div>`;
+  const qBox = () => `<div class="card"><div class="muted center">Question ${S.idx + 1} / ${S.total}</div><div class="question">${sanitize(S.front)}</div>${((host && showAns) || S.phase === 'reveal') && S.answer ? `<div class="answer">${sanitize(S.answer)}</div>` : ''}</div>`;
 
   if (S.phase === 'lobby') {
     const me = S.players.find((p) => p.name === myName);
     h += `<div class="card center"><h2>Salle d'attente</h2><p class="muted">Le maître lancera la partie.</p><button id="readyBtn" class="${me?.ready ? 'ok' : 'primary'}">${me?.ready ? '✅ Prêt (annuler)' : 'Je suis prêt !'}</button></div>`;
   } else if (S.phase === 'question') {
     h += qBox();
-    if (host) h += '<div class="actions"><button id="skipBtn">Passer la question</button></div>';
+    if (host) h += hostActions(false);
     else h += `<button id="buzz" ${S.locked.includes(myName) ? 'disabled' : ''}>${S.locked.includes(myName) ? 'Bloqué' : 'BUZZ'}</button>`;
   } else if (S.phase === 'answering') {
     h += qBox();
     h += `<div class="banner">🔔 <b>${esc(S.buzzer)}</b> répond !</div><div class="timer" id="timer"></div>`;
-    if (host) h += '<div class="actions"><button class="ok" id="okBtn">✓ Valider (+1)</button><button class="ko" id="koBtn">✗ Refuser</button></div>';
+    if (host) h += hostActions(true);
     else h += '<button id="buzz" disabled>…</button>';
   } else if (S.phase === 'reveal') {
     h += qBox();
@@ -333,7 +342,7 @@ function render() {
   const on = (id, fn) => { const b = $(id); if (b) b.onclick = fn; };
   on('#readyBtn', () => send({ t: 'ready', v: !S.players.find((p) => p.name === myName)?.ready }));
   on('#buzz', () => send({ t: 'buzz' }));
-  on('#skipBtn', skip); on('#okBtn', validate); on('#koBtn', refuse); on('#nextBtn', next); on('#againBtn', backToLobby);
+  on('#ansBtn', () => { showAns = !showAns; render(); }); on('#skipBtn', skip); on('#okBtn', validate); on('#koBtn', refuse); on('#nextBtn', next); on('#againBtn', backToLobby);
 }
 
 setInterval(() => {
