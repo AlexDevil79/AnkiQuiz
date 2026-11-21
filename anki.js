@@ -112,12 +112,12 @@ async function loadApkg(file, fname) {
   } catch {}
 
   const { models, decks } = modern ? readModern(db) : readLegacy(db);
-  const rows = db.exec('SELECT c.did, c.ord, n.mid, n.flds FROM cards c JOIN notes n ON n.id = c.nid ORDER BY c.id')[0]?.values || [];
+  const rows = db.exec('SELECT c.did, c.ord, n.mid, n.flds, n.tags FROM cards c JOIN notes n ON n.id = c.nid ORDER BY c.id')[0]?.values || [];
   db.close();
 
   const src = { zip, media };
   const byDeck = new Map();
-  for (const [did, ord, mid, flds] of rows) {
+  for (const [did, ord, mid, flds, tagStr] of rows) {
     const vals = flds.split('\x1f');
     const model = models[mid];
     let front, answer;
@@ -131,7 +131,7 @@ async function loadApkg(file, fname) {
     if (!strip(front).trim() && !/<img/i.test(front)) continue;
     const name = decks[did] || fname.replace(/\.apkg$/i, '');
     if (!byDeck.has(name)) byDeck.set(name, []);
-    byDeck.get(name).push({ front, answer, src });
+    byDeck.get(name).push({ front, answer, src, tags: String(tagStr || '').trim().split(/\s+/).filter(Boolean) });
   }
   removeFile(fname);
   for (const [name, cards] of byDeck) {

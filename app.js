@@ -25,7 +25,7 @@ let role = null; // 'host' | 'player' | 'tv'
 let peer = null, conn = null;
 let myName = '';
 let S = null; // état public (reçu ou calculé)
-let timerEnd = 0, showAns = false;
+let timerEnd = 0, showAns = false, peek = null;
 let G = null; // état du maître
 const conns = new Map(); // pseudo | 'tv:<id>' -> connexion
 const genCode = () => Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
@@ -203,6 +203,9 @@ function lockWithTeam(name) {
 }
 
 /* ---- déroulé ---- */
+let selTags = new Set();
+const checkedCards = () => [...document.querySelectorAll('.deckSel:checked')].flatMap((i) => library[+i.value].cards);
+const poolCards = () => { const c = checkedCards(); return selTags.size ? c.filter((x) => x.tags.some((g) => selTags.has(g))) : c; };
 const selectedKeys = () => [...document.querySelectorAll('.deckSel:checked')].map((i) => library[+i.value]?.key);
 
 function readSettings() {
@@ -212,7 +215,7 @@ function readSettings() {
 }
 
 async function startGame() {
-  const sel = [...document.querySelectorAll('.deckSel:checked')].flatMap((i) => library[+i.value].cards);
+  const sel = poolCards();
   if (!sel.length) return alert(t('noDeck'));
   readSettings();
   for (let i = sel.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [sel[i], sel[j]] = [sel[j], sel[i]]; }
@@ -235,9 +238,15 @@ async function loadQuestion() {
 function toReveal(result) { clearTimeout(G.timer); G.paused = false; G.buzzer = null; G.result = result; G.phase = 'reveal'; showAns = true; }
 function checkAllLocked() { if (connected().every((p) => G.locked.has(p.name))) toReveal({ none: true }); }
 
+function peekTo(name) {
+  const c = conns.get(name);
+  if (c && c.open && G.current) c.send({ t: 'peek', idx: G.idx, answer: G.current.answer });
+}
+
 function refuse() {
   if (G.phase !== 'answering') return;
   clearTimeout(G.timer); G.paused = false;
+  peekTo(G.buzzer); // le joueur qui a buzzé voit la réponse à la fin de son tour
   lockWithTeam(G.buzzer); G.buzzer = null; G.phase = 'question';
   checkAllLocked();
   broadcast();
@@ -258,7 +267,7 @@ function validate() {
   broadcast();
 }
 
-function skip() { if (G.phase === 'question') { toReveal({ none: true }); broadcast(); } }
+function skip() { if (G.phase === 'question' || G.phase === 'answering') { toReveal({ none: true }); broadcast(); } }
 
 function togglePause() {
   if (G.phase !== 'question' && G.phase !== 'answering') return;
@@ -279,12 +288,15 @@ function adjust(name, d) {
   broadcast();
 }
 
-async function award(name) {
+function award(name) {
   if (G.phase === 'lobby' || G.phase === 'end') return;
-  clearTimeout(G.timer);
-  if (G.players[name]) { G.players[name].score++; markWin(name); }
-  G.buzzer = null; G.paused = false;
-  await advance();
+  const p = G.players[name];
+  if (!p) return;
+  p.score++;
+  markWin(name);
+  // en cours de question : on révèle la réponse, mais on ne passe pas à la suivante
+  if (G.phase === 'question' || G.phase === 'answering') toReveal({ name });
+  broadcast();
 }
 
 async function next() { if (G.phase === 'reveal') await advance(); }
@@ -341,7 +353,7 @@ function saveSession() {
     ls('qa-host', JSON.stringify({
       code: G.code, phase: G.phase, idx: G.idx, queue: G.queue.map((c) => c.key),
       players: Object.values(G.players).map(({ name, ready, score, team, token }) => ({ name, ready, score, team, token })),
-      locked: [...G.locked], lastBuzzer: G.lastBuzzer, result: G.result, settings: G.settings, sel: selectedKeys(), log: G.log, ts: Date.now(),
+      locked: [...G.locked], lastBuzzer: G.lastBuzzer, result: G.result, settings: G.settings, sel: selectedKeys(), tags: [...selTags], log: G.log, ts: Date.now(),
     }));
   } catch {}
 }
@@ -350,6 +362,7 @@ const savedHost = () => { try { const s = JSON.parse(ls('qa-host')); return s &&
 async function restore(sv) {
   G.settings = Object.assign(G.settings, sv.settings);
   syncSettingsUI();
+  selTags = new Set(sv.tags || []);
   updateDecks(sv.sel);
   sv.players.forEach((p) => (G.players[p.name] = { ...p, connected: false }));
   const map = new Map();
@@ -389,7 +402,7 @@ function updateSetup() {
     : `<p class="muted">${t('waitPlayers')}</p>`;
   document.querySelectorAll('[data-team]').forEach((b) => (b.onclick = () => cycleTeam(b.dataset.team)));
   document.querySelectorAll('[data-kick]').forEach((b) => (b.onclick = () => confirm(t('kickConfirm', { n: b.dataset.kick })) && kick(b.dataset.kick)));
-  $('#startBtn').disabled = !ps.length || !library.length;
+  $('#startBtn').disabled = !ps.length || !poolCards().length;
 }
 
 let knownDecks = new Set();
@@ -406,8 +419,51 @@ function updateDecks(sel) {
     updateDecks();
     if (G) updateSetup();
   }));
+  updateTags();
+}
+
+function updateTags() {
+  const base = checkedCards();
+  const cnt = new Map();
+  base.forEach((c) => c.tags.forEach((g) => cnt.set(g, (cnt.get(g) || 0) + 1)));
+  [...selTags].forEach((g) => { if (!cnt.has(g)) selTags.delete(g); });
+  const tags = [...cnt.keys()].sort((a, b) => a.localeCompare(b));
+  const box = $('#tagBox');
+  const wasOpen = box.querySelector('details')?.open;
+  $('#tagCard').hidden = !tags.length;
+  const item = (g) => `<label class="tagitem"><input type="checkbox" class="tagSel" value="${esc(g)}" ${selTags.has(g) ? 'checked' : ''}><span>${esc(g)} <small>${cnt.get(g)}</small></span></label>`;
+  const clear = `<button class="kick" id="tagClear" ${selTags.size ? '' : 'hidden'}>${t('tagsClear')}</button>`;
+  box.innerHTML = tags.length <= 10
+    ? `<div class="tagchips">${tags.map(item).join('')}</div>${clear}`
+    : `<details class="tagmenu" ${wasOpen ? 'open' : ''}><summary id="tagSum">${t('tagsMenu', { n: selTags.size })}</summary><input type="text" id="tagFilter" placeholder="${t('tagFilterPh')}"><div class="taglist">${tags.map(item).join('')}</div>${clear}</details>`;
+  refreshPool();
+}
+
+function refreshPool() {
+  const n = poolCards().length;
+  $('#poolInfo').textContent = t('poolCount', { n });
+  const sum = $('#tagSum'); if (sum) sum.textContent = t('tagsMenu', { n: selTags.size });
+  const cl = $('#tagClear'); if (cl) cl.hidden = !selTags.size;
   if (G) updateSetup();
 }
+
+$('#tagBox').addEventListener('change', (e) => {
+  if (!e.target.classList.contains('tagSel')) return;
+  e.target.checked ? selTags.add(e.target.value) : selTags.delete(e.target.value);
+  refreshPool(); saveSession();
+});
+$('#tagBox').addEventListener('input', (e) => {
+  if (e.target.id !== 'tagFilter') return;
+  const q = deaccent(e.target.value);
+  document.querySelectorAll('#tagBox .tagitem').forEach((l) => (l.style.display = deaccent(l.textContent).includes(q) ? '' : 'none'));
+});
+$('#tagBox').addEventListener('click', (e) => {
+  if (e.target.id !== 'tagClear') return;
+  selTags.clear();
+  document.querySelectorAll('#tagBox .tagSel').forEach((i) => (i.checked = false));
+  refreshPool(); saveSession();
+});
+$('#deckList').addEventListener('change', (e) => { if (e.target.classList.contains('deckSel')) { updateTags(); saveSession(); } });
 
 async function loadSavedDecks() {
   if (library.length) return;
@@ -436,8 +492,10 @@ function joinRoom(code, name, tv = false, silent = false) {
     c.on('data', (d) => {
       if (d.t === 'error') { fatal = true; reconnecting = false; ls('qa-player', ''); S = null; show('home'); banner(''); $('#joinErr').textContent = t(d.msg); c.close(); return; }
       if (d.t === 'kicked') { leave(t('kicked')); return; }
+      if (d.t === 'peek') { peek = { idx: d.idx, answer: d.answer }; if (S) render(); return; }
       if (d.t === 'state') {
         S = d.s; S.rcv = performance.now();
+        if (peek && (peek.idx !== S.idx || S.phase === 'lobby')) peek = null;
         if (!reconnecting && !tv) { reconnecting = true; ls('qa-player', JSON.stringify({ code, name, ts: Date.now() })); }
         $('#roomTag').textContent = t('room') + ' ' + code;
         banner('');
@@ -452,13 +510,26 @@ function leave(msg) {
   left = true; reconnecting = false; clearTimeout(retryT);
   ls('qa-player', '');
   try { peer && peer.destroy(); } catch {}
-  S = null; role = null; banner('');
+  S = null; role = null; peek = null; banner('');
+  try { wl && wl.release(); } catch {}
   $('#roomTag').textContent = '';
   $('#joinErr').textContent = msg || '';
   show('home');
 }
 
 const send = (m) => conn && conn.open && conn.send(m);
+
+/* ================= Ecran toujours allumé ================= */
+let wl = null;
+async function keepAwake() {
+  try {
+    if ('wakeLock' in navigator && !wl) {
+      wl = await navigator.wakeLock.request('screen');
+      wl.addEventListener('release', () => { wl = null; });
+    }
+  } catch { wl = null; }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S) keepAwake(); });
 
 /* ================= Rendu ================= */
 const hue = (n) => { let h = 0; for (const c of n) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
@@ -505,7 +576,7 @@ function playerRow(p, i, host) {
   const cls = ['pl', !p.connected && 'off', S.buzzer === p.name && 'buzz', S.locked.includes(p.name) && (S.phase === 'question' || S.phase === 'answering') && 'locked', p.name === myName && 'me', S.phase === 'lobby' && p.ready && 'ready', (prevScores[p.name] ?? p.score) < p.score && 'pop'].filter(Boolean).join(' ');
   const sc = S.phase === 'lobby' ? (p.ready ? '✓' : '…') : p.score;
   const minus = host ? `<button class="minus" data-minus="${esc(p.name)}" title="${t('minusTip')}">−1</button>` : '';
-  const plus = host && S.phase !== 'end' ? `<button class="plus" data-award="${esc(p.name)}" title="${t('plusTip')}">+1 ▶</button>` : '';
+  const plus = host && S.phase !== 'end' ? `<button class="plus" data-award="${esc(p.name)}" title="${t('plusTip')}">+1</button>` : '';
   return `<div class="${cls}" style="--c:${colOf(p.name)}">${S.teams ? '' : `<span class="rk">${i + 1}</span>`}${av(p.name)}<span class="nm">${esc(p.name)}</span><span class="sc">${sc}</span>${minus}${plus}</div>`;
 }
 
@@ -522,9 +593,9 @@ function board(host) {
 }
 
 function qcard() {
-  const showA = role === 'host' ? showAns : S.phase === 'reveal';
+  const ansHtml = role === 'host' ? (showAns ? S.answer : '') : S.phase === 'reveal' ? S.answer : (role === 'player' && peek && peek.idx === S.idx ? peek.answer : '');
   const pct = ((S.idx + (S.phase === 'reveal' ? 1 : 0)) / S.total) * 100;
-  return `<div class="qcard"><div class="qmeta">${t('questionN', { i: S.idx + 1, n: S.total })}</div><div class="prog"><i style="width:${pct}%"></i></div><div class="question">${sanitize(S.front)}</div>${showA && S.answer ? `<div class="answer"><span class="lbl">${t('answer')}</span>${sanitize(S.answer)}</div>` : ''}</div>`;
+  return `<div class="qcard"><div class="qmeta">${t('questionN', { i: S.idx + 1, n: S.total })}</div><div class="prog"><i style="width:${pct}%"></i></div><div class="question">${sanitize(S.front)}</div>${ansHtml ? `<div class="answer"><span class="lbl">${t('answer')}</span>${sanitize(ansHtml)}</div>` : ''}</div>`;
 }
 
 const resultBanner = () => `<div class="status reveal">${S.result?.name ? t('pointFor', { n: `<b>${esc(S.result.name)}</b>` }) : t('nobody')}</div>`;
@@ -570,8 +641,9 @@ function hostView() {
   const ans = `<button id="ansBtn" class="btn">${showAns ? '🙈 ' + t('hideAnswer') : '👁 ' + t('showAnswer')} <kbd>A</kbd></button>`;
   let ctl = '';
   if (ph === 'question' || ph === 'answering') {
-    ctl = (S.lastBuzzer ? `<button id="okBtn" class="btn ok big">${t('validate', { n: esc(S.lastBuzzer) })} <kbd>V</kbd></button>` : `<button id="skipBtn" class="btn big">${t('skip')} <kbd>P</kbd></button>`) +
+    ctl = (S.lastBuzzer ? `<button id="okBtn" class="btn ok big">${t('validate', { n: esc(S.lastBuzzer) })} <kbd>V</kbd></button>` : '') +
       (ph === 'answering' ? `<button id="koBtn" class="btn ko big">${t('refuse')} <kbd>R</kbd></button>` : '') +
+      `<button id="skipBtn" class="btn${S.lastBuzzer ? '' : ' big'}">${t('skip')} <kbd>P</kbd></button>` +
       `<button id="pauseBtn" class="btn">${S.paused ? '▶ ' + t('resume') : '⏸ ' + t('pause')} <kbd>␣</kbd></button>` + ans;
   } else if (ph === 'reveal') ctl = `<button id="nextBtn" class="btn primary big">${t('next')} <kbd>␣</kbd></button>` + ans;
   else if (ph === 'end') ctl = `<button id="againBtn" class="btn primary big">${t('newGame')}</button>`;
@@ -626,6 +698,7 @@ function render() {
   if (!S) return;
   if (role === 'host' && S.phase === 'lobby') return show('setup');
   show('game');
+  keepAwake();
   const g = $('#game');
   g.dataset.role = role;
   document.body.dataset.state = stateName();
@@ -664,7 +737,7 @@ document.addEventListener('keydown', (e) => {
   if (k === 'a') { showAns = !showAns; render(); }
   else if (k === 'v' && S.lastBuzzer && S.phase !== 'reveal') validate();
   else if (k === 'r' && S.phase === 'answering') refuse();
-  else if (k === 'p' && S.phase === 'question' && !S.lastBuzzer) skip();
+  else if (k === 'p' && (S.phase === 'question' || S.phase === 'answering')) skip();
   else if (e.code === 'Space' || k === 'n' || k === 'enter') {
     e.preventDefault();
     if (S.phase === 'reveal') next(); else togglePause();
