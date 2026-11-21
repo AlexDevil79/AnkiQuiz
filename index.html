@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Quizz Anki</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header><h1>🔔 Quizz Anki</h1><span id="roomTag"></span></header>
+<main>
+  <section id="home" class="view">
+    <div class="card">
+      <h2>Rejoindre une partie</h2>
+      <input id="joinCode" placeholder="Code de la room" maxlength="5" autocapitalize="characters" autocomplete="off">
+      <input id="joinName" placeholder="Pseudo" maxlength="20" autocomplete="off">
+      <button id="joinBtn" class="primary">Rejoindre</button>
+      <p id="joinErr" class="err"></p>
+    </div>
+    <div class="card">
+      <h2>Animer une partie</h2>
+      <p class="muted">Tu crées la room, charges tes decks et arbitres les réponses.</p>
+      <button id="hostBtn">Créer une room (maître)</button>
+    </div>
+  </section>
+
+  <section id="setup" class="view">
+    <div class="card center">
+      <div class="muted">Code de la room</div>
+      <div id="roomCode" class="bigcode">…</div>
+      <button id="copyLink" class="small">Copier le lien d'invitation</button>
+    </div>
+    <div class="card">
+      <h2>1. Decks</h2>
+      <input type="file" id="files" accept=".apkg" multiple>
+      <p id="loadMsg" class="muted"></p>
+      <div id="deckList"></div>
+    </div>
+    <div class="card">
+      <h2>2. Paramètres</h2>
+      <label>Nombre de questions <input type="number" id="nbQ" min="1" value="20"></label>
+      <label>Secondes pour répondre <input type="number" id="secs" min="2" value="10"></label>
+      <label class="row"><input type="checkbox" id="auto"> Démarrer dès que tout le monde est prêt</label>
+    </div>
+    <div class="card">
+      <h2>3. Joueurs</h2>
+      <div id="lobbyPlayers"></div>
+      <button id="startBtn" class="primary" disabled>Lancer la partie</button>
+    </div>
+  </section>
+
+  <section id="game" class="view"></section>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/sql-wasm.js"></script>
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
