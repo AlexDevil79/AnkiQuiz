@@ -203,9 +203,12 @@ function lockWithTeam(name) {
 }
 
 /* ---- déroulé ---- */
-let selTags = new Set();
+const NOTAG = '\u0000';
+let offTags = new Set(); // tags décochés (par défaut tout est coché)
+let tagKeys = [];
+const cardOn = (c) => (c.tags.length ? c.tags.some((g) => !offTags.has(g)) : !offTags.has(NOTAG));
 const checkedCards = () => [...document.querySelectorAll('.deckSel:checked')].flatMap((i) => library[+i.value].cards);
-const poolCards = () => { const c = checkedCards(); return selTags.size ? c.filter((x) => x.tags.some((g) => selTags.has(g))) : c; };
+const poolCards = () => checkedCards().filter(cardOn);
 const selectedKeys = () => [...document.querySelectorAll('.deckSel:checked')].map((i) => library[+i.value]?.key);
 
 function readSettings() {
@@ -353,7 +356,7 @@ function saveSession() {
     ls('qa-host', JSON.stringify({
       code: G.code, phase: G.phase, idx: G.idx, queue: G.queue.map((c) => c.key),
       players: Object.values(G.players).map(({ name, ready, score, team, token }) => ({ name, ready, score, team, token })),
-      locked: [...G.locked], lastBuzzer: G.lastBuzzer, result: G.result, settings: G.settings, sel: selectedKeys(), tags: [...selTags], log: G.log, ts: Date.now(),
+      locked: [...G.locked], lastBuzzer: G.lastBuzzer, result: G.result, settings: G.settings, sel: selectedKeys(), tagsOff: [...offTags], log: G.log, ts: Date.now(),
     }));
   } catch {}
 }
@@ -362,7 +365,7 @@ const savedHost = () => { try { const s = JSON.parse(ls('qa-host')); return s &&
 async function restore(sv) {
   G.settings = Object.assign(G.settings, sv.settings);
   syncSettingsUI();
-  selTags = new Set(sv.tags || []);
+  offTags = new Set(sv.tagsOff || []);
   updateDecks(sv.sel);
   sv.players.forEach((p) => (G.players[p.name] = { ...p, connected: false }));
   const map = new Map();
@@ -423,34 +426,38 @@ function updateDecks(sel) {
 }
 
 function updateTags() {
-  const base = checkedCards();
   const cnt = new Map();
-  base.forEach((c) => c.tags.forEach((g) => cnt.set(g, (cnt.get(g) || 0) + 1)));
-  [...selTags].forEach((g) => { if (!cnt.has(g)) selTags.delete(g); });
-  const tags = [...cnt.keys()].sort((a, b) => a.localeCompare(b));
+  checkedCards().forEach((c) => (c.tags.length ? c.tags : [NOTAG]).forEach((g) => cnt.set(g, (cnt.get(g) || 0) + 1)));
+  const real = [...cnt.keys()].filter((g) => g !== NOTAG).sort((a, b) => a.localeCompare(b));
+  if (!real.length) offTags.clear();
+  [...offTags].forEach((g) => { if (!cnt.has(g)) offTags.delete(g); });
+  tagKeys = cnt.has(NOTAG) && real.length ? [...real, NOTAG] : real;
   const box = $('#tagBox');
   const wasOpen = box.querySelector('details')?.open;
-  $('#tagCard').hidden = !tags.length;
-  const item = (g) => `<label class="tagitem"><input type="checkbox" class="tagSel" value="${esc(g)}" ${selTags.has(g) ? 'checked' : ''}><span>${esc(g)} <small>${cnt.get(g)}</small></span></label>`;
-  const clear = `<button class="kick" id="tagClear" ${selTags.size ? '' : 'hidden'}>${t('tagsClear')}</button>`;
-  box.innerHTML = tags.length <= 10
-    ? `<div class="tagchips">${tags.map(item).join('')}</div>${clear}`
-    : `<details class="tagmenu" ${wasOpen ? 'open' : ''}><summary id="tagSum">${t('tagsMenu', { n: selTags.size })}</summary><input type="text" id="tagFilter" placeholder="${t('tagFilterPh')}"><div class="taglist">${tags.map(item).join('')}</div>${clear}</details>`;
+  $('#tagCard').hidden = !real.length;
+  const item = (g, i) => `<label class="tagitem"><input type="checkbox" class="tagSel" value="${i}" ${offTags.has(g) ? '' : 'checked'}><span>${esc(g === NOTAG ? t('noTag') : g)} <small>${cnt.get(g)}</small></span></label>`;
+  const btns = `<div class="tagbtns"><button class="kick" id="tagAll">${t('tagsAll')}</button><button class="kick" id="tagNone">${t('tagsNone')}</button></div>`;
+  box.innerHTML = tagKeys.length <= 10
+    ? `${btns}<div class="tagchips">${tagKeys.map(item).join('')}</div>`
+    : `<details class="tagmenu" ${wasOpen ? 'open' : ''}><summary id="tagSum"></summary>${btns}<input type="text" id="tagFilter" placeholder="${t('tagFilterPh')}"><div class="taglist">${tagKeys.map(item).join('')}</div></details>`;
   refreshPool();
 }
 
 function refreshPool() {
-  const n = poolCards().length;
-  $('#poolInfo').textContent = t('poolCount', { n });
-  const sum = $('#tagSum'); if (sum) sum.textContent = t('tagsMenu', { n: selTags.size });
-  const cl = $('#tagClear'); if (cl) cl.hidden = !selTags.size;
+  $('#poolInfo').textContent = t('poolCount', { n: poolCards().length });
+  const sum = $('#tagSum');
+  if (sum) sum.textContent = t('tagsMenu', { n: tagKeys.filter((g) => !offTags.has(g)).length, m: tagKeys.length });
   if (G) updateSetup();
 }
 
+const keepScroll = (fn) => { const y = window.scrollY; fn(); window.scrollTo(0, y); };
 $('#tagBox').addEventListener('change', (e) => {
   if (!e.target.classList.contains('tagSel')) return;
-  e.target.checked ? selTags.add(e.target.value) : selTags.delete(e.target.value);
-  refreshPool(); saveSession();
+  keepScroll(() => {
+    const g = tagKeys[+e.target.value];
+    e.target.checked ? offTags.delete(g) : offTags.add(g);
+    refreshPool(); saveSession();
+  });
 });
 $('#tagBox').addEventListener('input', (e) => {
   if (e.target.id !== 'tagFilter') return;
@@ -458,10 +465,13 @@ $('#tagBox').addEventListener('input', (e) => {
   document.querySelectorAll('#tagBox .tagitem').forEach((l) => (l.style.display = deaccent(l.textContent).includes(q) ? '' : 'none'));
 });
 $('#tagBox').addEventListener('click', (e) => {
-  if (e.target.id !== 'tagClear') return;
-  selTags.clear();
-  document.querySelectorAll('#tagBox .tagSel').forEach((i) => (i.checked = false));
-  refreshPool(); saveSession();
+  if (e.target.id !== 'tagAll' && e.target.id !== 'tagNone') return;
+  keepScroll(() => {
+    const all = e.target.id === 'tagAll';
+    offTags = all ? new Set() : new Set(tagKeys);
+    document.querySelectorAll('#tagBox .tagSel').forEach((i) => (i.checked = all));
+    refreshPool(); saveSession();
+  });
 });
 $('#deckList').addEventListener('change', (e) => { if (e.target.classList.contains('deckSel')) { updateTags(); saveSession(); } });
 

@@ -52,7 +52,7 @@ const I18N = {
     waitingRoom: "Salle d'attente", masterStarts: 'Le maître lancera la partie.', readyCancel: '✅ Prêt (annuler)', imReady: 'Je suis prêt !',
     buzz: 'BUZZ', yourTurn: 'À TOI !', blocked: 'Bloqué', youBlocked: 'Tu es bloqué pour cette question', buzzIf: 'Buzze si tu connais la réponse !',
     tvJoin: 'Rejoignez la partie sur',
-    tagsTitle: 'Tags', tagsMenu: 'Tags ({n} sélectionné(s))', tagFilterPh: 'Filtrer les tags…', tagsClear: 'Tout décocher', poolCount: '{n} cartes dans le tirage',
+    tagsTitle: 'Tags', tagsMenu: 'Tags ({n}/{m} cochés)', tagFilterPh: 'Filtrer les tags…', tagsAll: 'Tout cocher', tagsNone: 'Tout décocher', noTag: '(sans tag)', poolCount: '{n} cartes dans le tirage',
   },
   en: {
     tagline: 'The multiplayer buzzer quiz built from your Anki decks.',
@@ -88,7 +88,7 @@ const I18N = {
     waitingRoom: 'Waiting room', masterStarts: 'The host will start the game.', readyCancel: '✅ Ready (cancel)', imReady: "I'm ready!",
     buzz: 'BUZZ', yourTurn: 'YOUR TURN!', blocked: 'Locked', youBlocked: 'You are locked for this question', buzzIf: 'Buzz if you know the answer!',
     tvJoin: 'Join the game at',
-    tagsTitle: 'Tags', tagsMenu: 'Tags ({n} selected)', tagFilterPh: 'Filter tags…', tagsClear: 'Clear all', poolCount: '{n} cards in the draw',
+    tagsTitle: 'Tags', tagsMenu: 'Tags ({n}/{m} checked)', tagFilterPh: 'Filter tags…', tagsAll: 'Check all', tagsNone: 'Uncheck all', noTag: '(no tag)', poolCount: '{n} cards in the draw',
   },
 };
 
